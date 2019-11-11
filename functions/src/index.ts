@@ -1,18 +1,52 @@
 import * as functions from 'firebase-functions';
 import * as puppeteer from 'puppeteer';
+import * as line from '@line/bot-sdk';
 
 // // Start writing Firebase Functions
 // // https://firebase.google.com/docs/functions/typescript
 
-export const helloWorld = functions.https.onRequest(async (request, response) => {
+const config = {
+  channelAccessToken: functions.config().line.channel_access_token,
+  channelSecret: functions.config().line.channel_secret,
+} as line.Config;
+
+const client = new line.Client(config as line.ClientConfig);
+
+export const lineWebhook = functions.runWith({ memory: '1GB' }).https.onRequest(async (request, response) => {
+  const signature = request.get('x-line-signature');
+
+  if (!signature || !line.validateSignature(request.rawBody, config.channelSecret as string, signature)) {
+    throw new line.SignatureValidationFailed('signature validation failed', signature);
+  }
+
+  Promise.all(request.body.events.map(handleLineEvent))
+    .then(result => response.json(result))
+    .catch(error => console.error(error));
+});
+
+const handleLineEvent = (event: line.WebhookEvent) => {
+  if (event.type !== 'message' || event.message.type !== 'text') {
+    return Promise.resolve(null);
+  }
+
+  return client.replyMessage(event.replyToken, {
+    type: 'text',
+    text: event.message.text,
+  });
+};
+
+export const helloWorld = functions.runWith({ memory: '1GB' }).https.onRequest(async (request, response) => {
   const result = await getRingFitSaleStatus();
   response.json({ result });
 });
 
-export const helloPubSub = functions.pubsub.topic('ring-fit-adventure').onPublish(async message => {
-  const result = await getRingFitSaleStatus();
-  return result;
-});
+export const helloPubSub = functions
+  .runWith({ memory: '1GB' })
+  .pubsub.topic('ring-fit-adventure')
+  .onPublish(async message => {
+    const result = await getRingFitSaleStatus();
+    return result;
+  });
 
 const getRingFitSaleStatus = async () => {
   const browser = await puppeteer.launch({
