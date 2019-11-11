@@ -44,6 +44,7 @@ const handleLineEvent = async (event: line.WebhookEvent) => {
 
   let replyText = text;
   if (text === 'チェック') {
+    await client.pushMessage(targetUserId, { type: 'text', text: 'クロール中...' });
     const result = await checkRingFitStatus();
     replyText = result.resultText;
   }
