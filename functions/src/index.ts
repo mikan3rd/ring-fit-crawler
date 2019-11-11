@@ -1,10 +1,16 @@
 import * as functions from 'firebase-functions';
+import * as admin from 'firebase-admin';
 import * as puppeteer from 'puppeteer';
 import * as line from '@line/bot-sdk';
 
 // // Start writing Firebase Functions
 // // https://firebase.google.com/docs/functions/typescript
 
+admin.initializeApp();
+const db = admin.firestore();
+const { FieldValue } = admin.firestore;
+
+const targetUserId = functions.config().line.user_id;
 const config = {
   channelAccessToken: functions.config().line.channel_access_token,
   channelSecret: functions.config().line.channel_secret,
@@ -38,12 +44,8 @@ const handleLineEvent = async (event: line.WebhookEvent) => {
 
   let replyText = text;
   if (text === 'チェック') {
-    const result = await getRingFitSaleStatus();
-    if (result) {
-      replyText = result;
-    } else {
-      replyText = '取得できませんでした';
-    }
+    const result = await checkRingFitStatus();
+    replyText = result.resultText;
   }
 
   return client.replyMessage(event.replyToken, {
@@ -56,7 +58,7 @@ export const helloWorld = functions
   .runWith({ memory: '1GB' })
   .region('asia-northeast1')
   .https.onRequest(async (request, response) => {
-    const result = await getRingFitSaleStatus();
+    const result = await checkRingFitStatus();
     response.json({ result });
   });
 
@@ -65,25 +67,70 @@ export const helloPubSub = functions
   .region('asia-northeast1')
   .pubsub.topic('ring-fit-adventure')
   .onPublish(async message => {
-    const result = await getRingFitSaleStatus();
+    const result = await checkRingFitStatus();
+    if (result.difference) {
+      await client.pushMessage(targetUserId, { type: 'text', text: result.resultText });
+    }
     return result;
   });
 
+const checkRingFitStatus = async () => {
+  const ringFitCrawlType = 'ring-fit-adventure';
+  const resultText = await getRingFitSaleStatus();
+  const difference = await updateCrawlResult(ringFitCrawlType, resultText);
+  return { difference, resultText };
+};
+
 const getRingFitSaleStatus = async () => {
-  const browser = await puppeteer.launch({
-    headless: true,
-    args: ['--no-sandbox', '--disable-setuid-sandbox'],
-  });
-  const page = await browser.newPage();
+  let content = '';
+  try {
+    const browser = await puppeteer.launch({
+      headless: true,
+      args: ['--no-sandbox', '--disable-setuid-sandbox'],
+    });
+    const page = await browser.newPage();
 
-  const url = 'https://store.nintendo.co.jp/item/HAC_Q_AL3PA.html';
-  await page.goto(url);
+    const url = 'https://store.nintendo.co.jp/item/HAC_Q_AL3PA.html';
+    await page.goto(url);
 
-  const content = await page.$eval('.item-cart-add-area__add-button', item => item.textContent);
+    content = (await page.$eval('.item-cart-add-area__add-button', item => item.textContent)) || '取得できませんでした';
 
+    await browser.close();
+  } catch (error) {
+    content = JSON.stringify(error);
+  }
   console.log('content', content);
-
-  await browser.close();
-
   return content;
+};
+
+const updateCrawlResult = async (crawlType: string, newResultText: string) => {
+  const crawlCollection = db.collection('crawl');
+  const snapshot = await crawlCollection
+    .where('crawlType', '==', crawlType)
+    .limit(1)
+    .get();
+
+  if (!snapshot.empty) {
+    const result = snapshot.docs[0].data();
+    const { resultText } = result;
+
+    if (newResultText === resultText) {
+      return false;
+    }
+  }
+
+  const crawlData = {
+    crawlType,
+    resultText: newResultText,
+    updated_at: FieldValue.serverTimestamp(),
+  };
+
+  crawlCollection
+    .doc()
+    .set(crawlData, { merge: true })
+    .catch(err => {
+      throw new functions.https.HttpsError('internal', 'Failed to set crawl data', err);
+    });
+
+  return true;
 };
