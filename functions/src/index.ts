@@ -52,6 +52,18 @@ const handleLineEvent = async (event: line.WebhookEvent) => {
   return client.replyMessage(event.replyToken, {
     type: 'text',
     text: replyText,
+    quickReply: {
+      items: [
+        {
+          type: 'action',
+          action: {
+            type: 'message',
+            label: 'チェック',
+            text: 'チェック',
+          },
+        },
+      ],
+    },
   });
 };
 
