@@ -18,6 +18,19 @@ const config = {
 
 const client = new line.Client(config as line.ClientConfig);
 
+const checkQuickReply = {
+  items: [
+    {
+      type: 'action',
+      action: {
+        type: 'message',
+        label: 'チェック',
+        text: 'チェック',
+      },
+    },
+  ],
+} as line.QuickReply;
+
 export const lineWebhook = functions
   .runWith({ memory: '1GB' })
   .region('asia-northeast1')
@@ -52,28 +65,9 @@ const handleLineEvent = async (event: line.WebhookEvent) => {
   return client.replyMessage(event.replyToken, {
     type: 'text',
     text: replyText,
-    quickReply: {
-      items: [
-        {
-          type: 'action',
-          action: {
-            type: 'message',
-            label: 'チェック',
-            text: 'チェック',
-          },
-        },
-      ],
-    },
+    quickReply: checkQuickReply,
   });
 };
-
-export const helloWorld = functions
-  .runWith({ memory: '1GB' })
-  .region('asia-northeast1')
-  .https.onRequest(async (request, response) => {
-    const result = await checkRingFitStatus();
-    response.json({ result });
-  });
 
 export const helloPubSub = functions
   .runWith({ memory: '1GB' })
@@ -82,7 +76,7 @@ export const helloPubSub = functions
   .onPublish(async message => {
     const result = await checkRingFitStatus();
     if (result.difference) {
-      await client.pushMessage(targetUserId, { type: 'text', text: result.resultText });
+      await client.pushMessage(targetUserId, { type: 'text', text: result.resultText, quickReply: checkQuickReply });
     }
     return result;
   });
