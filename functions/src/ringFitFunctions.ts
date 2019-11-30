@@ -73,7 +73,16 @@ const getRingFitSaleStatus = async () => {
 
     await page.goto(RING_FIT_URL);
 
-    content = (await page.$eval('.item-cart-add-area__add-button', item => item.textContent)) || '取得できませんでした';
+    const item = await page.$('.item-cart-add-area__add-button');
+    if (item) {
+      const value = await (await item.getProperty('value')).jsonValue();
+      if (value === 'カートに追加する') {
+        content = '在庫あり';
+      } else {
+        const textContent = await (await item.getProperty('textContent')).jsonValue();
+        content = value || textContent || '取得できませんでした';
+      }
+    }
 
     await browser.close();
   } catch (error) {
