@@ -3,17 +3,16 @@ import * as admin from 'firebase-admin';
 import * as puppeteer from 'puppeteer';
 import * as line from '@line/bot-sdk';
 
-// // Start writing Firebase Functions
-// // https://firebase.google.com/docs/functions/typescript
-
 admin.initializeApp();
 const db = admin.firestore();
 const { FieldValue } = admin.firestore;
 
-const targetUserId = functions.config().line.user_id;
+const LINE_ENV = functions.config().line;
+
+const targetUserId = LINE_ENV.user_id;
 const config = {
-  channelAccessToken: functions.config().line.channel_access_token,
-  channelSecret: functions.config().line.channel_secret,
+  channelAccessToken: LINE_ENV.channel_access_token,
+  channelSecret: LINE_ENV.channel_secret,
 } as line.Config;
 
 const client = new line.Client(config as line.ClientConfig);
