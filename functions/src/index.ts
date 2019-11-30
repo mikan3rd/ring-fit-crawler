@@ -68,7 +68,7 @@ const handleLineEvent = async (event: line.WebhookEvent) => {
   });
 };
 
-export const helloPubSub = functions
+export const checkRingFitPubSub = functions
   .runWith({ memory: '1GB' })
   .region('asia-northeast1')
   .pubsub.topic('ring-fit-adventure')
@@ -111,28 +111,27 @@ const getRingFitSaleStatus = async () => {
 
 const updateCrawlResult = async (crawlType: string, newResultText: string) => {
   const crawlCollection = db.collection('crawl');
-  const snapshot = await crawlCollection
-    .where('crawlType', '==', crawlType)
-    .limit(1)
-    .get();
+  const doc = await crawlCollection.doc(crawlType).get();
 
-  if (!snapshot.empty) {
-    const result = snapshot.docs[0].data();
+  if (doc.exists) {
+    const result = doc.data();
+    if (!result) {
+      return false;
+    }
+
     const { resultText } = result;
-
     if (newResultText === resultText) {
       return false;
     }
   }
 
   const crawlData = {
-    crawlType,
     resultText: newResultText,
     updated_at: FieldValue.serverTimestamp(),
   };
 
   crawlCollection
-    .doc()
+    .doc(crawlType)
     .set(crawlData, { merge: true })
     .catch(err => {
       throw new functions.https.HttpsError('internal', 'Failed to set crawl data', err);
