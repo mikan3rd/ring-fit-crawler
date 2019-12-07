@@ -2,12 +2,14 @@ import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
 import * as puppeteer from 'puppeteer';
 import * as line from '@line/bot-sdk';
+import axios from 'axios';
 
 admin.initializeApp();
 const db = admin.firestore();
 const { FieldValue } = admin.firestore;
 
 const LINE_ENV = functions.config().line;
+const SLACK_ENV = functions.config().slack;
 
 export const targetUserId = LINE_ENV.user_id;
 export const config = {
@@ -30,7 +32,10 @@ export const checkQuickReply = {
   ],
 } as line.QuickReply;
 
+const RING_FIT_WEBHOOK = SLACK_ENV.ringfit_webhook;
 const RING_FIT_URL = 'https://store.nintendo.co.jp/item/HAC_Q_AL3PA.html';
+
+type JSObject = { [p: string]: any };
 
 export const handleLineEvent = async (event: line.WebhookEvent) => {
   if (event.type !== 'message' || event.message.type !== 'text') {
@@ -60,6 +65,8 @@ export const handleRingFitPubsubEvent = async () => {
   if (result.difference) {
     const text = `${result.resultText}\n${RING_FIT_URL}`;
     await client.pushMessage(targetUserId, { type: 'text', text, quickReply: checkQuickReply });
+    const data = { attachments: [{ text, color: '#f79600' }] };
+    await postSlack(RING_FIT_WEBHOOK, data);
   }
   return result;
 };
@@ -130,4 +137,13 @@ const updateCrawlResult = async (crawlType: string, newResultText: string) => {
     });
 
   return true;
+};
+
+const postSlack = async (url: string, data: JSObject) => {
+  try {
+    const response = await axios.post(url, data);
+    console.log(response);
+  } catch (error) {
+    console.error(error);
+  }
 };
