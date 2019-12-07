@@ -141,8 +141,7 @@ const updateCrawlResult = async (crawlType: string, newResultText: string) => {
 
 const postSlack = async (url: string, data: JSObject) => {
   try {
-    const response = await axios.post(url, data);
-    console.log(response);
+    await axios.post(url, data);
   } catch (error) {
     console.error(error);
   }
