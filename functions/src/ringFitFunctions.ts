@@ -45,7 +45,7 @@ export const handleLineEvent = async (event: line.WebhookEvent) => {
   if (text === 'チェック') {
     await client.pushMessage(targetUserId, { type: 'text', text: 'クロール中...' });
     const result = await checkRingFitStatus();
-    replyText = result.resultText;
+    replyText = `${result.resultText}\n${RING_FIT_URL}`;
   }
 
   return client.replyMessage(event.replyToken, {
@@ -53,6 +53,15 @@ export const handleLineEvent = async (event: line.WebhookEvent) => {
     text: replyText,
     quickReply: checkQuickReply,
   });
+};
+
+export const handleRingFitPubsubEvent = async () => {
+  const result = await checkRingFitStatus();
+  if (result.difference) {
+    const text = `${result.resultText}\n${RING_FIT_URL}`;
+    await client.pushMessage(targetUserId, { type: 'text', text, quickReply: checkQuickReply });
+  }
+  return result;
 };
 
 export const checkRingFitStatus = async () => {

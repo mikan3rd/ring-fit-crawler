@@ -1,7 +1,7 @@
 import * as functions from 'firebase-functions';
 import * as line from '@line/bot-sdk';
 
-import { handleLineEvent, config, checkQuickReply, targetUserId, client, checkRingFitStatus } from './ringFitFunctions';
+import { config, handleLineEvent, handleRingFitPubsubEvent } from './ringFitFunctions';
 
 export const lineWebhook = functions
   .runWith({ memory: '1GB' })
@@ -23,9 +23,5 @@ export const checkRingFitPubSub = functions
   .region('asia-northeast1')
   .pubsub.topic('ring-fit-adventure')
   .onPublish(async message => {
-    const result = await checkRingFitStatus();
-    if (result.difference) {
-      await client.pushMessage(targetUserId, { type: 'text', text: result.resultText, quickReply: checkQuickReply });
-    }
-    return result;
+    await handleRingFitPubsubEvent();
   });
